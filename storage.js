@@ -65,18 +65,17 @@ var storage = function (readyCallback, type) {
         case 'WebSQL':
             storage.WebSQL(invokeReadyCallBack, commons);
             break;
-//          Still in draft, will implement later
-//        case 'IndexedDB':
-//            storage.IndexedDB(invokeReadyCallBack, commons);
-//            break;
+        case 'IndexedDB':
+            storage.IndexedDB(invokeReadyCallBack, commons);
+            break;
         default :
             //WebSQL
             if (window.openDatabase) {
                 window.console.log("Using WebSQL");
                 storage.WebSQL(invokeReadyCallBack, commons);
-//          IndexedDB Still in draft, will implement later
-//            } else if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB) {
-//                storage.IndexedDB(invokeReadyCallBack, commons);
+            } else if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB) {
+                window.console.log("Using IndexedDB");
+                storage.IndexedDB(invokeReadyCallBack, commons);
             } else {
                 window.console.log("Using LocalStorage");
                 //Fallback to localStorage
@@ -126,10 +125,6 @@ storage.KeyValue = function (ready, commons, useSession) {
         storage.setItem(entity, JSON.stringify(stored));
 
         callback();
-    };
-
-    var _clear = function (key) {
-        storage.setItem(key, undefined);
     };
 
     var _remove = function (entity, id) {
@@ -295,44 +290,173 @@ storage.WebSQL = function (ready, commons) {
         );
     };
 
-    var _init = (function () {
-        try {
-            if (!window.openDatabase) {
-                window.console.log('SQL Database not supported');
-                ready();
-            } else {
-                var shortName = 'storage.js';
-                var version = '1.0';
-                var displayName = 'storage.js database';
-                var maxSize = 65536; // in bytes
-                db = openDatabase(shortName, version, displayName, maxSize);
+    try {
+        if (!window.openDatabase) {
+            window.console.log('SQL Database not supported');
+            ready();
+        } else {
+            var shortName = 'storage.js';
+            var version = '1.0';
+            var displayName = 'storage.js database';
+            var maxSize = 65536; // in bytes
+            db = openDatabase(shortName, version, displayName, maxSize);
 
-                ready({
-                    set:_set,
-                    setAll:function (entity, values, callback) {
-                        var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
-                        values.forEach(function (value) {
-                            _set(entity, value, responseCallback.countDown);
-                        });
-                    },
-                    get:_get,
-                    getAll:_getAll,
-                    remove:_remove,
-                    removeAll:_removeAll
-                });
-            }
-        } catch (e) {
-            // Error handling code goes here.
-            if (e === 2) {
-                // Version number mismatch.
-                window.console.log("Invalid database version.");
-            } else {
-                window.console.log("Unknown error " + e + ".");
-            }
+            ready({
+                set:_set,
+                setAll:function (entity, values, callback) {
+                    var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
+                    values.forEach(function (value) {
+                        _set(entity, value, responseCallback.countDown);
+                    });
+                },
+                get:_get,
+                getAll:_getAll,
+                remove:_remove,
+                removeAll:_removeAll
+            });
         }
-    })();
+    } catch (e) {
+        // Error handling code goes here.
+        if (e === 2) {
+            // Version number mismatch.
+            window.console.log("Invalid database version.");
+        } else {
+            window.console.log("Unknown error " + e + ".");
+        }
+    }
 };
 
 storage.IndexedDB = function (ready, commons) {
-    //Still in draft, will implement later
+    var indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
+    var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.mozIDBTransaction || window.msIDBTransaction;
+    var db;
+
+    var _createObjectStore = function (entity, callback) {
+        var versionRequest = db.setVersion(new Date().getTime());
+        versionRequest.onsuccess = function (event) {
+//            var db = event.target.result;
+            console.log("Creating")
+            db.createObjectStore(entity, { keyPath:"id" });
+            callback();
+        };
+    };
+
+    var _set = function (entity, value, callback) {
+        try {
+            var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+            transaction.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+
+            var objectStore = transaction.objectStore(entity);
+            var request = objectStore.put(value);
+            request.onsuccess = callback;
+            request.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+        } catch (error) {
+            //error code 3 and 8 are not found on chrome and canary respectively
+            if (error.code !== 3 && error.code !== 8) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+                callback();
+            } else {
+                window.console.log("IndexedDB: going to create objectStore " + entity);
+                _createObjectStore(entity, function () {
+                    _set(entity, value, callback);
+                });
+            }
+        }
+    };
+
+    var _get = function (entity, id, callback) {
+        try {
+            var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+            transaction.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+
+            var objectStore = transaction.objectStore(entity);
+            objectStore.get(id).onsuccess = function (event) {
+                callback(event.target.result);
+            };
+        } catch (error) {
+            callback();
+        }
+    };
+
+    var _getAll = function (entity, callback) {
+        console.log("GETALL");
+        try {
+            var objectArray=[];
+            var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+            transaction.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+
+            var objectStore = transaction.objectStore(entity);
+            objectStore.openCursor().onsuccess = function (event) {
+                var cursor = event.target.result;
+                if (cursor) {
+                    objectArray.push(cursor.value);
+                    cursor.continue();
+                }
+                else {
+                    callback(objectArray);
+                }
+            };
+        } catch (error) {
+            callback();
+        }
+    };
+
+    var _remove = function (entity, id, callback) {
+        window.console.log("remove");
+    };
+
+    var _removeAll = function (entity, callback) {
+        var request = db.setVersion(new Date().getTime());
+        request.onsuccess = function (event) {
+            try {
+                db.deleteObjectStore(entity);
+                callback();
+            } catch (error) {
+                //error code 3 and 8 are not found on chrome and canary respectively
+                if (error.code !== 3 && error.code !== 8) {
+                    window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+                } else {
+                    callback();
+                }
+            }
+        };
+    };
+
+    if (indexedDB) {
+        // Now we can open our database
+        var request = indexedDB.open("storage_js");
+        request.onupgradeneeded = function (event) {
+            window.console.log("UPGRADE NEEDED");
+        };
+        request.onsuccess = function (event) {
+            db = request.result;
+            ready({
+                set:_set,
+                setAll:function (entity, values, callback) {
+                    var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
+                    values.forEach(function (value) {
+                        _set(entity, value, responseCallback.countDown);
+                    });
+                },
+                get:_get,
+                getAll:_getAll,
+                remove:_remove,
+                removeAll:_removeAll
+            });
+        };
+        request.onerror = function (event) {
+            window.console.log("An error ocurred", event);
+            ready();
+        };
+    } else {
+        ready();
+    }
 };
