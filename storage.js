@@ -8,6 +8,22 @@
 var storage = function (readyCallback, type) {
 
     var commons = {
+        sequencialActionCallbackWrapper: function(values, callback, finalCallback) {
+            var index = 0;
+            var length = values.length;
+
+            var _next = function() {
+                if (index < length) {
+                    callback(values[index++]);
+                } else {
+                    finalCallback();
+                }
+            };
+
+            return{
+                next: _next
+            };
+        },
         multipleActionCallbackWrapper:function (times, callback) {
             var values = [];
 
@@ -28,11 +44,9 @@ var storage = function (readyCallback, type) {
         } else {
             readyCallback({
                 set:function (entity, value, callback) {
-                    window.console.log("Setting " + entity, value);
                     database.set(entity, value, callback);
                 },
                 setAll:function (entity, values, callback) {
-                    window.console.log("Setting all " + entity, values);
                     database.setAll(entity, values, callback);
                 },
                 get:function (entity, id, callback) {
@@ -45,12 +59,12 @@ var storage = function (readyCallback, type) {
                     database.remove(entity, id, callback);
                 },
                 removeAll:function (entity, callback) {
-                    window.console.log("Removing all " + entity);
                     database.removeAll(entity, callback);
                 },
                 ready:function (callback) {
                     database.ready(callback);
-                }
+                },
+                close:database.close
             });
         }
     };
@@ -160,6 +174,9 @@ storage.KeyValue = function (ready, commons, useSession) {
         removeAll:function (entity, callback) {
             storage.removeItem(entity);
             callback();
+        },
+        close:function(){
+            //There is nothing to do
         }
     });
 };
@@ -302,17 +319,20 @@ storage.WebSQL = function (ready, commons) {
             db = openDatabase(shortName, version, displayName, maxSize);
 
             ready({
-                set:_set,
-                setAll:function (entity, values, callback) {
+                set: _set,
+                setAll: function(entity, values, callback) {
                     var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
-                    values.forEach(function (value) {
+                    values.forEach(function(value) {
                         _set(entity, value, responseCallback.countDown);
                     });
                 },
-                get:_get,
-                getAll:_getAll,
-                remove:_remove,
-                removeAll:_removeAll
+                get: _get,
+                getAll: _getAll,
+                remove: _remove,
+                removeAll: _removeAll,
+                close: function() {
+                    //There is nothing to do
+                }
             });
         }
     } catch (e) {
@@ -385,7 +405,6 @@ storage.IndexedDB = function (ready, commons) {
     };
 
     var _getAll = function (entity, callback) {
-        console.log("GETALL");
         try {
             var objectArray=[];
             var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
@@ -405,16 +424,22 @@ storage.IndexedDB = function (ready, commons) {
                 }
             };
         } catch (error) {
-            callback();
+            callback([]);
         }
     };
 
     var _remove = function (entity, id, callback) {
-        window.console.log("remove");
+        var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+        var objectStore = transaction.objectStore(entity);
+        objectStore.delete(id).onsuccess=function(){callback();};
     };
 
     var _removeAll = function (entity, callback) {
         var request = db.setVersion(new Date().getTime());
+
+        request.onblocked=function(){
+            window.console.log('IndexedDB Error: There is an open connection to the database');
+        };
         request.onsuccess = function (event) {
             try {
                 db.deleteObjectStore(entity);
@@ -430,6 +455,10 @@ storage.IndexedDB = function (ready, commons) {
         };
     };
 
+    var _close = function(){
+        db.close();
+    };
+
     if (indexedDB) {
         // Now we can open our database
         var request = indexedDB.open("storage_js");
@@ -441,15 +470,16 @@ storage.IndexedDB = function (ready, commons) {
             ready({
                 set:_set,
                 setAll:function (entity, values, callback) {
-                    var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
-                    values.forEach(function (value) {
-                        _set(entity, value, responseCallback.countDown);
-                    });
+                    var seqWrapper = commons.sequencialActionCallbackWrapper(values, function(value) {
+                        _set(entity, value, seqWrapper.next);
+                    }, callback);
+                    seqWrapper.next();
                 },
                 get:_get,
                 getAll:_getAll,
                 remove:_remove,
-                removeAll:_removeAll
+                removeAll:_removeAll,
+                close:_close
             });
         };
         request.onerror = function (event) {

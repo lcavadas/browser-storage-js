@@ -157,6 +157,7 @@ $(document).ready(function() {
             storage.get("unexistantAddsNew", 1, function(value) {
                 equal(value.id, testValue.id, "retrieved value matches sent value id");
                 equal(value.name, testValue.name, "retrieved value matches sent value name");
+                storage.close();
                 start();
             });
         });
@@ -164,7 +165,6 @@ $(document).ready(function() {
 
     var existantUpdates = function(storage) {
         var testValue = {id:1, name:"sample 1"};
-
         storage.set("existantUpdates", testValue, function() {
             storage.get("existantUpdates", 1, function(value) {
                 equal(value.id, testValue.id, "original retrieved value matches sent value id");
@@ -173,6 +173,7 @@ $(document).ready(function() {
                     storage.get("existantUpdates", 1, function(value) {
                         equal(value.id, testValue.id, "set retrieved value matches sent value id");
                         equal(value.name, "ahaha", "set retrieved value matches new value name");
+                        storage.close();
                         start();
                     });
                 });
@@ -197,6 +198,7 @@ $(document).ready(function() {
                         equal(values[0].name, "ahaha", "retrieved value matches new value name");
                         equal(values[1].id, otherValue.id, "retrieved value matches sent value id");
                         equal(values[1].name, otherValue.name, "retrieved value matches new value name");
+                        storage.close();
                         start();
                     });
                 });
@@ -214,6 +216,7 @@ $(document).ready(function() {
                 equal(values[0].name, "sample 1", "name of first element");
                 equal(values[1].id, 2, "id of second element");
                 equal(values[1].name, "sample 2", "name of second element");
+                storage.close();
                 start();
             });
         });
@@ -228,6 +231,7 @@ $(document).ready(function() {
                     equal(values.length, 1, "has one result");
                     equal(values[0].id, 2, "id of element");
                     equal(values[0].name, "sample 2", "name of element");
+                    storage.close();
                     start();
                 });
             });
@@ -241,6 +245,7 @@ $(document).ready(function() {
             storage.removeAll("removeAll", function() {
                 storage.getAll("removeAll", function(values) {
                     equal(values.length, 0, "has no results");
+                    storage.close();
                     start();
                 });
             });
