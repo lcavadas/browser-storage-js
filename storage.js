@@ -8,6 +8,22 @@
 var storage = function (readyCallback, type) {
 
     var commons = {
+        sequencialActionCallbackWrapper: function(values, callback, finalCallback) {
+            var index = 0;
+            var length = values.length;
+
+            var _next = function() {
+                if (index < length) {
+                    callback(values[index++]);
+                } else {
+                    finalCallback();
+                }
+            };
+
+            return{
+                next: _next
+            };
+        },
         multipleActionCallbackWrapper:function (times, callback) {
             var values = [];
 
@@ -28,11 +44,9 @@ var storage = function (readyCallback, type) {
         } else {
             readyCallback({
                 set:function (entity, value, callback) {
-                    window.console.log("Setting " + entity, value);
                     database.set(entity, value, callback);
                 },
                 setAll:function (entity, values, callback) {
-                    window.console.log("Setting all " + entity, values);
                     database.setAll(entity, values, callback);
                 },
                 get:function (entity, id, callback) {
@@ -45,12 +59,12 @@ var storage = function (readyCallback, type) {
                     database.remove(entity, id, callback);
                 },
                 removeAll:function (entity, callback) {
-                    window.console.log("Removing all " + entity);
                     database.removeAll(entity, callback);
                 },
                 ready:function (callback) {
                     database.ready(callback);
-                }
+                },
+                close:database.close
             });
         }
     };
@@ -65,18 +79,17 @@ var storage = function (readyCallback, type) {
         case 'WebSQL':
             storage.WebSQL(invokeReadyCallBack, commons);
             break;
-//          Still in draft, will implement later
-//        case 'IndexedDB':
-//            storage.IndexedDB(invokeReadyCallBack, commons);
-//            break;
+        case 'IndexedDB':
+            storage.IndexedDB(invokeReadyCallBack, commons);
+            break;
         default :
             //WebSQL
             if (window.openDatabase) {
                 window.console.log("Using WebSQL");
                 storage.WebSQL(invokeReadyCallBack, commons);
-//          IndexedDB Still in draft, will implement later
-//            } else if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB) {
-//                storage.IndexedDB(invokeReadyCallBack, commons);
+            } else if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB) {
+                window.console.log("Using IndexedDB");
+                storage.IndexedDB(invokeReadyCallBack, commons);
             } else {
                 window.console.log("Using LocalStorage");
                 //Fallback to localStorage
@@ -128,10 +141,6 @@ storage.KeyValue = function (ready, commons, useSession) {
         callback();
     };
 
-    var _clear = function (key) {
-        storage.setItem(key, undefined);
-    };
-
     var _remove = function (entity, id) {
         var stored = JSON.parse(storage.getItem(entity));
         var length = stored.length;
@@ -165,6 +174,9 @@ storage.KeyValue = function (ready, commons, useSession) {
         removeAll:function (entity, callback) {
             storage.removeItem(entity);
             callback();
+        },
+        close:function(){
+            //There is nothing to do
         }
     });
 };
@@ -295,44 +307,198 @@ storage.WebSQL = function (ready, commons) {
         );
     };
 
-    var _init = (function () {
-        try {
-            if (!window.openDatabase) {
-                window.console.log('SQL Database not supported');
-                ready();
-            } else {
-                var shortName = 'storage.js';
-                var version = '1.0';
-                var displayName = 'storage.js database';
-                var maxSize = 65536; // in bytes
-                db = openDatabase(shortName, version, displayName, maxSize);
+    try {
+        if (!window.openDatabase) {
+            window.console.log('SQL Database not supported');
+            ready();
+        } else {
+            var shortName = 'storage.js';
+            var version = '1.0';
+            var displayName = 'storage.js database';
+            var maxSize = 65536; // in bytes
+            db = openDatabase(shortName, version, displayName, maxSize);
 
-                ready({
-                    set:_set,
-                    setAll:function (entity, values, callback) {
-                        var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
-                        values.forEach(function (value) {
-                            _set(entity, value, responseCallback.countDown);
-                        });
-                    },
-                    get:_get,
-                    getAll:_getAll,
-                    remove:_remove,
-                    removeAll:_removeAll
-                });
-            }
-        } catch (e) {
-            // Error handling code goes here.
-            if (e === 2) {
-                // Version number mismatch.
-                window.console.log("Invalid database version.");
-            } else {
-                window.console.log("Unknown error " + e + ".");
-            }
+            ready({
+                set: _set,
+                setAll: function(entity, values, callback) {
+                    var responseCallback = commons.multipleActionCallbackWrapper(values.length, callback);
+                    values.forEach(function(value) {
+                        _set(entity, value, responseCallback.countDown);
+                    });
+                },
+                get: _get,
+                getAll: _getAll,
+                remove: _remove,
+                removeAll: _removeAll,
+                close: function() {
+                    //There is nothing to do
+                }
+            });
         }
-    })();
+    } catch (e) {
+        // Error handling code goes here.
+        if (e === 2) {
+            // Version number mismatch.
+            window.console.log("Invalid database version.");
+        } else {
+            window.console.log("Unknown error " + e + ".");
+        }
+    }
 };
 
 storage.IndexedDB = function (ready, commons) {
-    //Still in draft, will implement later
+    var indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
+    var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.mozIDBTransaction || window.msIDBTransaction;
+    var db;
+
+    var _createObjectStore = function (entity, callback) {
+        db.close();
+        var versionRequest = indexedDB.open("storage_js",new Date().getTime());
+        versionRequest.onupgradeneeded = function (event) {
+            db = versionRequest.result;
+            db.createObjectStore(entity, { keyPath:"id" });
+        };
+        versionRequest.onsuccess=function(){
+            callback();
+        }
+    };
+
+    var _set = function (entity, value, callback) {
+        try {
+            if(!db.objectStoreNames.contains(entity)){
+                window.console.log("IndexedDB: going to create objectStore " + entity);
+                _createObjectStore(entity, function () {
+                    window.console.log("IndexedDB: created objectStore " + entity);
+                    _set(entity, value, callback);
+                });
+                return;
+            }
+
+            var transaction = db.transaction([entity], "readwrite");
+            var objectStore = transaction.objectStore(entity);
+            var request = objectStore.put(value);
+            transaction.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+            request.onsuccess = function(){
+                callback();
+            }
+            request.onerror= function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+        } catch (error) {
+            //error code 3 and 8 are not found on chrome and canary respectively
+            if (error.code !== 3 && error.code !== 8) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+                callback();
+            } else {
+                window.console.log("IndexedDB: going to create objectStore " + entity);
+                _createObjectStore(entity, function () {
+                    _set(entity, value, callback);
+                });
+            }
+        }
+    };
+
+    var _get = function (entity, id, callback) {
+        try {
+            var transaction = db.transaction([entity], "readwrite");
+            transaction.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+
+            var objectStore = transaction.objectStore(entity);
+            objectStore.get(id).onsuccess = function (event) {
+                callback(event.target.result);
+            };
+        } catch (error) {
+            window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            callback();
+        }
+    };
+
+    var _getAll = function (entity, callback) {
+        try {
+            var objectArray=[];
+            var transaction = db.transaction([entity], "readwrite");
+            transaction.onerror = function (event) {
+                window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+            };
+
+            var objectStore = transaction.objectStore(entity);
+            objectStore.openCursor().onsuccess = function (event) {
+                var cursor = event.target.result;
+                if (cursor) {
+                    objectArray.push(cursor.value);
+                    cursor.continue();
+                }
+                else {
+                    callback(objectArray);
+                }
+            };
+        } catch (error) {
+            callback([]);
+        }
+    };
+
+    var _remove = function (entity, id, callback) {
+        var transaction = db.transaction([entity], "readwrite");
+        var objectStore = transaction.objectStore(entity);
+        objectStore.delete(id).onsuccess=function(){callback();};
+    };
+
+    var _removeAll = function (entity, callback) {
+        db.close();
+        var request = indexedDB.open("storage_js",new Date().getTime());
+        request.onupgradeneeded = function (event) {
+            try {
+                db = request.result;
+                if(db.objectStoreNames.contains(entity))
+                    db.deleteObjectStore(entity);
+                callback();
+            } catch (error) {
+                //error code 3 and 8 are not found on chrome and canary respectively
+                if (error.code !== 3 && error.code !== 8) {
+                    window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+                } else {
+                    callback();
+                }
+            }
+        };
+    };
+
+    var _close = function(){
+        db.close();
+    };
+
+    if (indexedDB) {
+        // Now we can open our database
+        var request = indexedDB.open("storage_js");
+        request.onupgradeneeded = function (event) {
+            window.console.log("UPGRADE NEEDED");
+        };
+        request.onsuccess = function (event) {
+            db = request.result;
+            ready({
+                set:_set,
+                setAll:function (entity, values, callback) {
+                    var seqWrapper = commons.sequencialActionCallbackWrapper(values, function(value) {
+                        _set(entity, value, seqWrapper.next);
+                    }, callback);
+                    seqWrapper.next();
+                },
+                get:_get,
+                getAll:_getAll,
+                remove:_remove,
+                removeAll:_removeAll,
+                close:_close
+            });
+        };
+        request.onerror = function (event) {
+            window.console.log("An error ocurred", event);
+            ready();
+        };
+    } else {
+        ready();
+    }
 };
