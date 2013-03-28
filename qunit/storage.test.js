@@ -98,7 +98,7 @@ $(document).ready(function() {
         }, 'WebSQL');
     });
 
-    module("IdexedDB");
+    module("IndexedDB");
     asyncTest("set unexistant adds new", function() {
         storage(function(storage) {
             _cleanup(storage, unexistantAddsNew);

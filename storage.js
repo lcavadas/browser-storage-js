@@ -352,26 +352,38 @@ storage.IndexedDB = function (ready, commons) {
     var db;
 
     var _createObjectStore = function (entity, callback) {
-        var versionRequest = db.setVersion(new Date().getTime());
-        versionRequest.onsuccess = function (event) {
-//            var db = event.target.result;
-            console.log("Creating")
+        db.close();
+        var versionRequest = indexedDB.open("storage_js",new Date().getTime());
+        versionRequest.onupgradeneeded = function (event) {
+            db = versionRequest.result;
             db.createObjectStore(entity, { keyPath:"id" });
-            callback();
         };
+        versionRequest.onsuccess=function(){
+            callback();
+        }
     };
 
     var _set = function (entity, value, callback) {
         try {
-            var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+            if(!db.objectStoreNames.contains(entity)){
+                window.console.log("IndexedDB: going to create objectStore " + entity);
+                _createObjectStore(entity, function () {
+                    window.console.log("IndexedDB: created objectStore " + entity);
+                    _set(entity, value, callback);
+                });
+                return;
+            }
+
+            var transaction = db.transaction([entity], "readwrite");
+            var objectStore = transaction.objectStore(entity);
+            var request = objectStore.put(value);
             transaction.onerror = function (event) {
                 window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
             };
-
-            var objectStore = transaction.objectStore(entity);
-            var request = objectStore.put(value);
-            request.onsuccess = callback;
-            request.onerror = function (event) {
+            request.onsuccess = function(){
+                callback();
+            }
+            request.onerror= function (event) {
                 window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
             };
         } catch (error) {
@@ -390,7 +402,7 @@ storage.IndexedDB = function (ready, commons) {
 
     var _get = function (entity, id, callback) {
         try {
-            var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+            var transaction = db.transaction([entity], "readwrite");
             transaction.onerror = function (event) {
                 window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
             };
@@ -400,6 +412,7 @@ storage.IndexedDB = function (ready, commons) {
                 callback(event.target.result);
             };
         } catch (error) {
+            window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
             callback();
         }
     };
@@ -407,7 +420,7 @@ storage.IndexedDB = function (ready, commons) {
     var _getAll = function (entity, callback) {
         try {
             var objectArray=[];
-            var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+            var transaction = db.transaction([entity], "readwrite");
             transaction.onerror = function (event) {
                 window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
             };
@@ -429,20 +442,19 @@ storage.IndexedDB = function (ready, commons) {
     };
 
     var _remove = function (entity, id, callback) {
-        var transaction = db.transaction([entity], IDBTransaction.READ_WRITE);
+        var transaction = db.transaction([entity], "readwrite");
         var objectStore = transaction.objectStore(entity);
         objectStore.delete(id).onsuccess=function(){callback();};
     };
 
     var _removeAll = function (entity, callback) {
-        var request = db.setVersion(new Date().getTime());
-
-        request.onblocked=function(){
-            window.console.log('IndexedDB Error: There is an open connection to the database');
-        };
-        request.onsuccess = function (event) {
+        db.close();
+        var request = indexedDB.open("storage_js",new Date().getTime());
+        request.onupgradeneeded = function (event) {
             try {
-                db.deleteObjectStore(entity);
+                db = request.result;
+                if(db.objectStoreNames.contains(entity))
+                    db.deleteObjectStore(entity);
                 callback();
             } catch (error) {
                 //error code 3 and 8 are not found on chrome and canary respectively
