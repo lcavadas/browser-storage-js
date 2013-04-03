@@ -1,0 +1,17 @@
+#!groovy
+buildscript {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
+    dependencies {
+        classpath "com.agentparadigm:gradle-devserver-plugin:0.0.1"
+    }
+}
+
+apply plugin: 'devserver'
+devserver{
+    port = 8080
+    rootPath='.'
+    workers = 10
+}
