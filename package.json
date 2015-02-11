@@ -1,0 +1,32 @@
+{
+  "name": "Storage.js",
+  "version": "0.1.0",
+  "description": "",
+  "repository": "git://github.com/lcavadas/Storage.js",
+  "author": {
+    "name": "Luís Serralheiro",
+    "email": "encavadas@gmail.com"
+  },
+  "jshintConfig": {
+    "bitwise": true,
+    "curly": true,
+    "eqeqeq": true,
+    "forin": true,
+    "latedef": true,
+    "noarg": true,
+    "noempty": true,
+    "nonew": true,
+    "undef": true,
+    "unused": true,
+    "browser": true
+  },
+  "devDependencies": {
+    "gulp": "^3.8.10",
+    "gulp-rename": "^1.2.0",
+    "gulp-uglify": "^1.0.2",
+    "gulp-jshint": "^1.9.0",
+    "gulp-concat": "^2.4.2",
+    "gulp-shell": "^0.2.11",
+    "docco": "^0.7.0"
+  }
+}
