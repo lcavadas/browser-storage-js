@@ -507,3 +507,4 @@ storage.IndexedDB = function (ready, commons) {
     ready();
   }
 };
+window.storage = storage;
