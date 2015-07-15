@@ -107,11 +107,14 @@ For practical example consult the unit tests. The unit tests can be run <a href=
 ##Known Limitations
 If IndexedDB is used only one connection can be established at a given time as external upgrades are not yet implemented.
 
-##Next Version
+##Future Versions
 * Implement the capability of external upgrades under IndexedDB.
 * Allow the indexing of fields other than the object's id.
 * Ability to query by something more than the object's id.
 
 ##Version History
+<b>ver 1.0.0</b>:
+<p>Added a minified version.</p>
+
 <b>ver 0.1.0</b>:
 <p>First working version of the API that is able to run the four implementations of WebStorage.</p>
