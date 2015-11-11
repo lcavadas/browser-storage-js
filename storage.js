@@ -112,7 +112,7 @@ storage.KeyValue = function (ready, commons, useSession) {
 
   var _get = function (entity, id, callback) {
     var stored = JSON.parse(kv.getItem(entity));
-    var length = stored.length;
+    var length = stored ? stored.length : 0;
 
     for (var i = 0; i < length; i++) {
       if (stored[i].id === id) {
