@@ -455,7 +455,8 @@ storage.IndexedDB = function (ready, commons) {
 
   var _removeAll = function (entity, callback) {
     db.close();
-    var request = indexedDB.open("storage_js", new Date().getTime());
+    var version = parseInt(Math.round(new Date().getTime() / 1000) % 1000000000);
+    var request = indexedDB.open("storage_js", version);
     request.onupgradeneeded = function () {
       try {
         db = request.result;
