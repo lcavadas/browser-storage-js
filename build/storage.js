@@ -112,7 +112,7 @@ storage.KeyValue = function (ready, commons, useSession) {
 
   var _get = function (entity, id, callback) {
     var stored = JSON.parse(kv.getItem(entity));
-    var length = stored.length;
+    var length = stored ? stored.length : 0;
 
     for (var i = 0; i < length; i++) {
       if (stored[i].id === id) {
@@ -355,7 +355,9 @@ storage.IndexedDB = function (ready, commons) {
 
   var _createObjectStore = function (entity, callback) {
     db.close();
-    var versionRequest = indexedDB.open("storage_js", new Date().getTime());
+    //IE fails with versions bigger that 9 digits and requires the type to be int (number fails with InvalidAccessError)
+    var version = parseInt(Math.round(new Date().getTime() / 1000) % 1000000000);
+    var versionRequest = indexedDB.open("storage_js", version);
     versionRequest.onupgradeneeded = function () {
       db = versionRequest.result;
       db.createObjectStore(entity, {keyPath: "id"});
@@ -380,18 +382,18 @@ storage.IndexedDB = function (ready, commons) {
       var objectStore = transaction.objectStore(entity);
       var request = objectStore.put(value);
       transaction.onerror = function (error) {
-        window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
       };
       request.onsuccess = function () {
         callback();
       };
       request.onerror = function (error) {
-        window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
       };
     } catch (error) {
       //error code 3 and 8 are not found on chrome and canary respectively
       if (error.code !== 3 && error.code !== 8) {
-        window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
         callback();
       } else {
         window.console.log("IndexedDB: going to create objectStore " + entity);
@@ -406,7 +408,7 @@ storage.IndexedDB = function (ready, commons) {
     try {
       var transaction = db.transaction([entity], "readwrite");
       transaction.onerror = function (error) {
-        window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
       };
 
       var objectStore = transaction.objectStore(entity);
@@ -414,7 +416,7 @@ storage.IndexedDB = function (ready, commons) {
         callback(event.target.result);
       };
     } catch (error) {
-      window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+      window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
       callback();
     }
   };
@@ -424,7 +426,7 @@ storage.IndexedDB = function (ready, commons) {
       var objectArray = [];
       var transaction = db.transaction([entity], "readwrite");
       transaction.onerror = function (error) {
-        window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
       };
 
       var objectStore = transaction.objectStore(entity);
@@ -453,7 +455,8 @@ storage.IndexedDB = function (ready, commons) {
 
   var _removeAll = function (entity, callback) {
     db.close();
-    var request = indexedDB.open("storage_js", new Date().getTime());
+    var version = parseInt(Math.round(new Date().getTime() / 1000) % 1000000000);
+    var request = indexedDB.open("storage_js", version);
     request.onupgradeneeded = function () {
       try {
         db = request.result;
@@ -464,7 +467,7 @@ storage.IndexedDB = function (ready, commons) {
       } catch (error) {
         //error code 3 and 8 are not found on chrome and canary respectively
         if (error.code !== 3 && error.code !== 8) {
-          window.console.log('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+          window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
         } else {
           callback();
         }
