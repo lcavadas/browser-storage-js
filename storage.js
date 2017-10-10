@@ -482,10 +482,7 @@ storage.IndexedDB = function (ready, commons) {
   if (indexedDB) {
     // Now we can open our database
     var request = indexedDB.open("storage_js");
-    request.onupgradeneeded = function () {
-      window.console.log("UPGRADE NEEDED");
-    };
-    request.onsuccess = function () {
+    request.onupgradeneeded = request.onsuccess = function () {
       db = request.result;
       ready({
         set: _set,
