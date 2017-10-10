@@ -1,8 +1,8 @@
 /*!
- * Storage.js JavaScript Library v0.1.0
+ * Storage.js JavaScript Library v1.0.0
  * https://github.com/lcavadas/Storage.js
  *
- * Copyright 2012, Luís Serralheiro
+ * Copyright 2012-2017, Luís Serralheiro
  */
 
 var storage = function (readyCallback, type) {
