@@ -64,7 +64,8 @@ var storage = function (readyCallback, type) {
         ready: function (callback) {
           database.ready(callback);
         },
-        close: database.close
+        close: database.close,
+        type: database.type
       });
     }
   };
@@ -84,12 +85,12 @@ var storage = function (readyCallback, type) {
       break;
     default :
       //WebSQL
-      if (window.openDatabase) {
-        window.console.log("Using WebSQL");
-        storage.WebSQL(invokeReadyCallBack, commons);
-      } else if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB) {
+      if (window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB) {
         window.console.log("Using IndexedDB");
         storage.IndexedDB(invokeReadyCallBack, commons);
+      } else if (window.openDatabase) {
+        window.console.log("Using WebSQL");
+        storage.WebSQL(invokeReadyCallBack, commons);
       } else {
         window.console.log("Using LocalStorage");
         //Fallback to localStorage
@@ -179,7 +180,8 @@ storage.KeyValue = function (ready, commons, useSession) {
     },
     close: function () {
       //There is nothing to do
-    }
+    },
+    type: 'KeyValue'
   });
 };
 
@@ -334,7 +336,8 @@ storage.WebSQL = function (ready, commons) {
         removeAll: _removeAll,
         close: function () {
           //There is nothing to do
-        }
+        },
+        type: 'WebSQL'
       });
     }
   } catch (e) {
@@ -350,21 +353,17 @@ storage.WebSQL = function (ready, commons) {
 
 storage.IndexedDB = function (ready, commons) {
   var indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
-  //var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.mozIDBTransaction || window.msIDBTransaction;
   var db;
 
   var _createObjectStore = function (entity, callback) {
     db.close();
-    //IE fails with versions bigger that 9 digits and requires the type to be int (number fails with InvalidAccessError)
-    var version = parseInt(Math.round(new Date().getTime() / 1000) % 1000000000);
+    var version = db.version + 1;
     var versionRequest = indexedDB.open("storage_js", version);
     versionRequest.onupgradeneeded = function () {
       db = versionRequest.result;
       db.createObjectStore(entity, {keyPath: "id"});
     };
-    versionRequest.onsuccess = function () {
-      callback();
-    };
+    versionRequest.onsuccess = callback;
   };
 
   var _set = function (entity, value, callback) {
@@ -448,14 +447,12 @@ storage.IndexedDB = function (ready, commons) {
   var _remove = function (entity, id, callback) {
     var transaction = db.transaction([entity], "readwrite");
     var objectStore = transaction.objectStore(entity);
-    objectStore.delete(id).onsuccess = function () {
-      callback();
-    };
+    objectStore.delete(id).onsuccess = callback;
   };
 
   var _removeAll = function (entity, callback) {
     db.close();
-    var version = parseInt(Math.round(new Date().getTime() / 1000) % 1000000000);
+    var version = db.version + 1;
     var request = indexedDB.open("storage_js", version);
     request.onupgradeneeded = function () {
       try {
@@ -463,16 +460,14 @@ storage.IndexedDB = function (ready, commons) {
         if (db.objectStoreNames.contains(entity)) {
           db.deleteObjectStore(entity);
         }
-        callback();
       } catch (error) {
         //error code 3 and 8 are not found on chrome and canary respectively
         if (error.code !== 3 && error.code !== 8) {
           window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
-        } else {
-          callback();
         }
       }
     };
+    request.onsuccess = callback;
   };
 
   var _close = function () {
@@ -482,7 +477,7 @@ storage.IndexedDB = function (ready, commons) {
   if (indexedDB) {
     // Now we can open our database
     var request = indexedDB.open("storage_js");
-    request.onupgradeneeded = request.onsuccess = function () {
+    request.onsuccess = function () {
       db = request.result;
       ready({
         set: _set,
@@ -496,7 +491,8 @@ storage.IndexedDB = function (ready, commons) {
         getAll: _getAll,
         remove: _remove,
         removeAll: _removeAll,
-        close: _close
+        close: _close,
+        type: 'IndexedDB'
       });
     };
     request.onerror = function (event) {

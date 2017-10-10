@@ -22,6 +22,6 @@
   });
 
   gulp.task('watch', function () {
-    gulp.watch('js/**/*.js', ['default']);
+    gulp.watch('*.js', ['default']);
   });
 }());
