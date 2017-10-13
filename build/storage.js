@@ -1,5 +1,5 @@
 /*!
- * Storage.js JavaScript Library v1.1.0
+ * Storage.js JavaScript Library v1.1.1
  * https://github.com/lcavadas/Storage.js
  *
  * Copyright 2012-2017, Luís Serralheiro
@@ -112,16 +112,21 @@ storage.KeyValue = function (ready, commons, useSession) {
   }
 
   var _get = function (entity, id, callback) {
-    var stored = JSON.parse(kv.getItem(entity));
-    var length = stored ? stored.length : 0;
+    var jsonString = kv.getItem(entity);
+    if(jsonString){
+      var stored = JSON.parse(jsonString);
+      var length = stored ? stored.length : 0;
 
-    for (var i = 0; i < length; i++) {
-      if (stored[i].id === id) {
-        callback(stored[i]);
-        return;
+      for (var i = 0; i < length; i++) {
+        if (stored[i].id === id) {
+          callback(stored[i]);
+          return;
+        }
       }
+      callback();
+    } else {
+      callback();
     }
-    callback();
   };
 
   var _set = function (entity, value, callback) {
@@ -145,14 +150,17 @@ storage.KeyValue = function (ready, commons, useSession) {
   };
 
   var _remove = function (entity, id) {
-    var stored = JSON.parse(kv.getItem(entity));
-    var length = stored.length;
+    var jsonString = kv.getItem(entity);
+    if(jsonString){
+      var stored = JSON.parse(jsonString);
+      var length = stored.length;
 
-    for (var i = 0; i < length; i++) {
-      if (stored[i].id === id) {
-        stored.splice(i, 1);
-        kv.setItem(entity, JSON.stringify(stored));
-        return;
+      for (var i = 0; i < length; i++) {
+        if (stored[i].id === id) {
+          stored.splice(i, 1);
+          kv.setItem(entity, JSON.stringify(stored));
+          return;
+        }
       }
     }
   };
@@ -405,15 +413,19 @@ storage.IndexedDB = function (ready, commons) {
 
   var _get = function (entity, id, callback) {
     try {
-      var transaction = db.transaction([entity], "readwrite");
-      transaction.onerror = function (error) {
-        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
-      };
-
-      var objectStore = transaction.objectStore(entity);
-      objectStore.get(id).onsuccess = function (event) {
-        callback(event.target.result);
-      };
+      if (!db.objectStoreNames.contains(entity)) {
+        window.console.log("IndexedDB: missing objectStore " + entity);
+        callback();
+      } else {
+        var transaction = db.transaction([entity], "readwrite");
+        transaction.onerror = function (error) {
+          window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        };
+        var objectStore = transaction.objectStore(entity);
+        objectStore.get(id).onsuccess = function (event) {
+          callback(event.target.result);
+        };
+      }
     } catch (error) {
       window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
       callback();
@@ -423,31 +435,40 @@ storage.IndexedDB = function (ready, commons) {
   var _getAll = function (entity, callback) {
     try {
       var objectArray = [];
-      var transaction = db.transaction([entity], "readwrite");
-      transaction.onerror = function (error) {
-        window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
-      };
-
-      var objectStore = transaction.objectStore(entity);
-      objectStore.openCursor().onsuccess = function (event) {
-        var cursor = event.target.result;
-        if (cursor) {
-          objectArray.push(cursor.value);
-          cursor.continue();
-        }
-        else {
-          callback(objectArray);
-        }
-      };
+      if (!db.objectStoreNames.contains(entity)) {
+        window.console.log("IndexedDB: missing objectStore " + entity);
+        callback(objectArray);
+      } else {
+        var transaction = db.transaction([entity], "readwrite");
+        transaction.onerror = function (error) {
+          window.console.trace('IndexedDB Error: ' + error.message + ' (Code ' + error.code + ')', error);
+        };
+        var objectStore = transaction.objectStore(entity);
+        objectStore.openCursor().onsuccess = function (event) {
+          var cursor = event.target.result;
+          if (cursor) {
+            objectArray.push(cursor.value);
+            cursor.continue();
+          }
+          else {
+            callback(objectArray);
+          }
+        };
+      }
     } catch (error) {
       callback([]);
     }
   };
 
   var _remove = function (entity, id, callback) {
-    var transaction = db.transaction([entity], "readwrite");
-    var objectStore = transaction.objectStore(entity);
-    objectStore.delete(id).onsuccess = callback;
+    if (!db.objectStoreNames.contains(entity)) {
+      window.console.log("IndexedDB: missing objectStore " + entity);
+      callback();
+    } else {
+      var transaction = db.transaction([entity], "readwrite");
+      var objectStore = transaction.objectStore(entity);
+      objectStore.delete(id).onsuccess = callback;
+    }
   };
 
   var _removeAll = function (entity, callback) {
@@ -503,4 +524,5 @@ storage.IndexedDB = function (ready, commons) {
     ready();
   }
 };
+
 window.storage = storage;
