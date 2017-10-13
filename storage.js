@@ -1,5 +1,5 @@
 /*!
- * Storage.js JavaScript Library v1.1.0
+ * Storage.js JavaScript Library v1.1.1
  * https://github.com/lcavadas/Storage.js
  *
  * Copyright 2012-2017, Luís Serralheiro
@@ -415,7 +415,7 @@ storage.IndexedDB = function (ready, commons) {
     try {
       if (!db.objectStoreNames.contains(entity)) {
         window.console.log("IndexedDB: missing objectStore " + entity);
-        callback(event.target.result);
+        callback();
       } else {
         var transaction = db.transaction([entity], "readwrite");
         transaction.onerror = function (error) {
@@ -524,4 +524,5 @@ storage.IndexedDB = function (ready, commons) {
     ready();
   }
 };
+
 window.storage = storage;

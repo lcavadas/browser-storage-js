@@ -113,6 +113,9 @@ If IndexedDB is used only one connection can be established at a given time as e
 * Ability to query by something more than the object's id.
 
 ## Version History
+<b>ver 1.1.1</b>:
+<p>Fixing issues arising from the non-existance of the underlying collection.</p>
+
 <b>ver 1.1.0</b>:
 <p>Improved the IndexedDB implementation and made it compatible with latest changes.</p>
 
