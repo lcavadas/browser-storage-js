@@ -1,4 +1,4 @@
-# Storage.js
+# Browser Storage JS
 
 JavaScript Library for Cross Browser Persistence using WebStorage (LocalStorage, SessionStorage, WebSQL and IndexedDB) for all browsers.
 
