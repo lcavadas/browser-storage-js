@@ -1,12 +1,16 @@
 {
-  "name": "Storage.js",
+  "name": "browser-storage-js",
   "version": "1.1.1",
-  "description": "",
-  "repository": "git://github.com/lcavadas/Storage.js",
+  "description": "JavaScript Library for Cross Browser Persistence using WebStorage (LocalStorage, SessionStorage, WebSQL and IndexedDB) for all browsers.",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/lcavadas/browser-storage-js"
+  },
   "author": {
     "name": "Luís Serralheiro",
     "email": "encavadas@gmail.com"
   },
+  "main": "./build/storage.min.js",
   "jshintConfig": {
     "bitwise": true,
     "curly": true,
