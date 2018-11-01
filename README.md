@@ -102,7 +102,7 @@ close()
 ```
 
 ## Practical examples
-For practical example consult the unit tests. The unit tests can be run <a href="https://lcavadas.github.com/Storage.js/">here</a>. The source code for the tests can be viewed <a href="https://github.com/lcavadas/Storage.js/blob/master/qunit/storage.test.js">here</a>.
+For practical example consult the unit tests. The unit tests can be run <a href="https://lcavadas.github.com/browser-storage-js/">here</a>. The source code for the tests can be viewed <a href="https://github.com/lcavadas/browser-storage-js/blob/master/qunit/storage.test.js">here</a>.
 
 ## Known Limitations
 If IndexedDB is used only one connection can be established at a given time as external upgrades are not yet implemented.
